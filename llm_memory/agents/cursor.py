@@ -1,4 +1,14 @@
-"""Cursor agent adapter - full session capture via stop hook."""
+"""Cursor agent adapter - full session lifecycle hooks.
+
+Cursor supports the same three hook points as Claude Code:
+  sessionStart  → inject knowledge context (returns additional_context)
+  sessionEnd    → capture transcript when session ends
+  preCompact    → capture transcript before context compaction
+
+Note: Cursor's sessionStart output format differs from Claude Code's.
+  Cursor:      { "additional_context": "..." }
+  Claude Code: { "hookSpecificOutput": { "hookEventName": "...", "additionalContext": "..." } }
+"""
 
 from __future__ import annotations
 
@@ -7,15 +17,10 @@ from pathlib import Path
 
 from llm_memory.agents.base import AgentAdapter, InstallResult
 
-_HOOKS_CONFIG = {
-    "version": 1,
-    "hooks": {
-        "stop": [
-            {
-                "command": "uv run python hooks/cursor-stop.py"
-            }
-        ]
-    },
+_HOOKS = {
+    "sessionStart": [{"command": "uv run python hooks/cursor-session-start.py", "timeout": 15}],
+    "sessionEnd":   [{"command": "uv run python hooks/cursor-session-end.py",   "timeout": 10}],
+    "preCompact":   [{"command": "uv run python hooks/cursor-pre-compact.py",   "timeout": 10}],
 }
 
 
@@ -31,25 +36,25 @@ class CursorAdapter(AgentAdapter):
 
         if hooks_file.exists():
             try:
-                existing = json.loads(hooks_file.read_text(encoding="utf-8"))
-                existing.setdefault("hooks", {})["stop"] = _HOOKS_CONFIG["hooks"]["stop"]
-                merged = existing
-                merged.setdefault("version", 1)
+                config = json.loads(hooks_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
-                merged = _HOOKS_CONFIG
+                config = {}
         else:
-            merged = _HOOKS_CONFIG
+            config = {}
 
-        hooks_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+        config["version"] = 1
+        config.setdefault("hooks", {}).update(_HOOKS)
+        # Remove the old stop hook if present from a previous install
+        config["hooks"].pop("stop", None)
+
+        hooks_file.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
         return InstallResult(
             files_written=[hooks_file],
-            manual_steps=["Open this project in Cursor to activate the stop hook."],
+            manual_steps=["Open this project in Cursor to activate sessionStart, sessionEnd, and preCompact hooks."],
         )
 
     def write_context_file(self, project_root: Path, context: str) -> Path:
-        # Context injection is handled automatically via the stop hook's flush pipeline.
-        # write_context_file is a no-op for Cursor.
         return self.context_file_path(project_root)
 
     def context_file_path(self, project_root: Path) -> Path:
