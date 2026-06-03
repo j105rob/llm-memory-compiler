@@ -49,6 +49,19 @@ CONFIGURED_AGENT = _cfg.get("agent", "claude-code")
 API_PROVIDER = _cfg.get("api_provider", "claude-agent-sdk")
 
 
+def lmc_cmd() -> list[str]:
+    """Return the shell command list to invoke lmc.
+
+    Prefers the globally installed `lmc` binary (PATH) so hook commands stay
+    short. Falls back to `uv run --directory ROOT_DIR lmc` when lmc isn't on
+    PATH (e.g. immediately after cloning, before running `lmc init`).
+    """
+    import shutil
+    if shutil.which("lmc"):
+        return ["lmc"]
+    return ["uv", "run", "--directory", str(ROOT_DIR), "lmc"]
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 

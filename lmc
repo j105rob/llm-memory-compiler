@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# lmc — LLM Memory Compiler
+# Local wrapper: runs lmc through uv from this repo's directory.
+# Install globally with:  lmc init   (writes ~/.local/bin/lmc)
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec uv run --directory "$SCRIPT_DIR" lmc "$@"

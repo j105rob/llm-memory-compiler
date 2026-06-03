@@ -25,6 +25,7 @@ anthropic = [
 
 [project.scripts]
 llm-memory-compiler = "llm_memory.cli:main"
+lmc = "llm_memory.cli:main"
 
 [tool.uv]
 package = true

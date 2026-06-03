@@ -22,7 +22,7 @@ class WindsurfAdapter(AgentAdapter):
         hooks_file = hooks_dir / "hooks.json"
 
         hook_entry = {
-            "command": "uv run python hooks/windsurf-hook.py",
+            "command": "./lmc hook windsurf",
             "working_directory": str(project_root),
         }
 

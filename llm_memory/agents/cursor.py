@@ -18,9 +18,9 @@ from pathlib import Path
 from llm_memory.agents.base import AgentAdapter, InstallResult
 
 _HOOKS = {
-    "sessionStart": [{"command": "uv run python hooks/cursor-session-start.py", "timeout": 15}],
-    "sessionEnd":   [{"command": "uv run python hooks/cursor-session-end.py",   "timeout": 10}],
-    "preCompact":   [{"command": "uv run python hooks/cursor-pre-compact.py",   "timeout": 10}],
+    "sessionStart": [{"command": "./lmc hook cursor-session-start", "timeout": 15}],
+    "sessionEnd":   [{"command": "./lmc hook cursor-session-end",   "timeout": 10}],
+    "preCompact":   [{"command": "./lmc hook cursor-pre-compact",   "timeout": 10}],
 }
 
 

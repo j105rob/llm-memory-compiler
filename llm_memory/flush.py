@@ -143,7 +143,8 @@ def maybe_trigger_compilation(root: Path, daily_dir: Path, state_dir: Path) -> N
 
     logging.info("End-of-day compilation triggered (after %d:00)", COMPILE_AFTER_HOUR)
 
-    cmd = ["uv", "run", "--directory", str(root), "llm-memory-compiler", "compile"]
+    from llm_memory.config import lmc_cmd
+    cmd = [*lmc_cmd(), "compile"]
 
     kwargs: dict = {}
     if sys.platform == "win32":

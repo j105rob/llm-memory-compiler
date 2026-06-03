@@ -50,7 +50,10 @@ class StandardHookAdapter(AgentAdapter):
     hook_event: str = "SessionEnd"
 
     def _hook_command(self, project_root: Path) -> str:
-        return f"uv run --directory {project_root} python hooks/generic-session-end.py"
+        # Use the absolute path to lmc so this command works from any CWD
+        # (global hooks run from the user's project, not the KB root).
+        lmc = project_root / "lmc"
+        return f"{lmc} hook generic-session-end"
 
     def _config_file(self, project_root: Path) -> Path:
         raise NotImplementedError

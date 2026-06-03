@@ -88,10 +88,8 @@ def main() -> None:
     context_file = STATE_DIR / f"cursor-compact-{conversation_id}-{timestamp}.md"
     context_file.write_text(context, encoding="utf-8")
 
-    cmd = [
-        "uv", "run", "--directory", str(ROOT_DIR),
-        "llm-memory-compiler", "flush", str(context_file), conversation_id,
-    ]
+    from llm_memory.config import lmc_cmd
+    cmd = [*lmc_cmd(), "flush", str(context_file), conversation_id]
 
     creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 

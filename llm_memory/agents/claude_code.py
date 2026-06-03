@@ -15,7 +15,7 @@ _SETTINGS_TEMPLATE = {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "uv run python hooks/session-start.py",
+                        "command": "./lmc hook session-start",
                         "timeout": 15,
                     }
                 ],
@@ -27,7 +27,7 @@ _SETTINGS_TEMPLATE = {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "uv run python hooks/pre-compact.py",
+                        "command": "./lmc hook pre-compact",
                         "timeout": 10,
                     }
                 ],
@@ -39,7 +39,7 @@ _SETTINGS_TEMPLATE = {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "uv run python hooks/session-end.py",
+                        "command": "./lmc hook session-end",
                         "timeout": 10,
                     }
                 ],
