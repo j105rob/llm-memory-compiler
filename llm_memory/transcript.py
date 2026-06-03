@@ -1,4 +1,4 @@
-"""Shared transcript extraction logic for Claude Code session hooks."""
+"""Transcript extraction logic for Claude Code and Cursor (JSONL) and Windsurf (step-centric JSONL)."""
 
 from __future__ import annotations
 
@@ -46,6 +46,48 @@ def extract_conversation_context(transcript_path: Path) -> tuple[str, int]:
             if isinstance(content, str) and content.strip():
                 label = "User" if role == "user" else "Assistant"
                 turns.append(f"**{label}:** {content.strip()}\n")
+
+    recent = turns[-MAX_TURNS:]
+    context = "\n".join(recent)
+
+    if len(context) > MAX_CONTEXT_CHARS:
+        context = context[-MAX_CONTEXT_CHARS:]
+        boundary = context.find("\n**")
+        if boundary > 0:
+            context = context[boundary + 1:]
+
+    return context, len(recent)
+
+
+def extract_windsurf_context(transcript_path: Path) -> tuple[str, int]:
+    """Extract conversation turns from Windsurf's step-centric JSONL format.
+
+    Windsurf transcripts use typed step entries rather than role/content pairs:
+      {"type": "user_input", "user_input": {"user_response": "..."}, ...}
+      {"type": "planner_response", "planner_response": {"response": "..."}, ...}
+    """
+    turns: list[str] = []
+
+    with open(transcript_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            entry_type = entry.get("type", "")
+
+            if entry_type == "user_input":
+                text = entry.get("user_input", {}).get("user_response", "")
+                if text.strip():
+                    turns.append(f"**User:** {text.strip()}\n")
+            elif entry_type == "planner_response":
+                text = entry.get("planner_response", {}).get("response", "")
+                if text.strip():
+                    turns.append(f"**Assistant:** {text.strip()}\n")
 
     recent = turns[-MAX_TURNS:]
     context = "\n".join(recent)

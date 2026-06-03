@@ -125,8 +125,11 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
     result = adapter.install(project_root)
 
     for f in result.files_written:
-        rel = f.relative_to(project_root) if f.is_absolute() else f
-        click.echo(f"  Wrote {rel}")
+        try:
+            label = f.relative_to(project_root)
+        except ValueError:
+            label = f  # outside project root (e.g. global ~/.codeium/ config)
+        click.echo(f"  Wrote {label}")
 
     # ── Sync dependencies ──
     import subprocess
