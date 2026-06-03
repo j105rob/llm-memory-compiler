@@ -6,10 +6,10 @@ Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/44
 
 ## Supported Agents
 
-| Agent | Support | Hook Event | Config Written |
-|-------|---------|------------|----------------|
-| **Claude Code** | Full auto-capture | SessionEnd, PreCompact | `.claude/settings.json` |
-| **Cursor** | Full auto-capture | stop | `.cursor/hooks.json` |
+| Agent | Support | Hook events | Config written |
+|-------|---------|-------------|----------------|
+| **Claude Code** | Full auto-capture | SessionStart, SessionEnd, PreCompact | `.claude/settings.json` |
+| **Cursor** | Full auto-capture | sessionStart, sessionEnd, preCompact | `.cursor/hooks.json` |
 | **Windsurf** | Full auto-capture | post_cascade_response_with_transcript | `~/.codeium/windsurf/hooks.json` |
 | **Gemini CLI** | Full auto-capture | SessionEnd | `~/.gemini/settings.json` |
 | **OpenAI Codex** | Full auto-capture | Stop | `~/.codex/hooks.json` |
@@ -26,15 +26,16 @@ Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/44
 git clone https://github.com/j105rob/llm-memory-compiler
 cd llm-memory-compiler
 uv sync
-uv run llm-memory-compiler init
+./lmc init
 ```
 
-The `init` wizard asks:
-1. **Which agent** you use
-2. **Which LLM provider** to use for compilation (claude-agent-sdk or Anthropic API key)
-3. **Directory names** for daily logs and knowledge articles (defaults are fine)
+`init` presents an interactive setup wizard that:
+1. Selects your AI agent from the list above
+2. Selects your LLM provider (claude-agent-sdk or Anthropic API key)
+3. Writes the hook config for that agent
+4. Installs `~/.local/bin/lmc` so you can run `lmc` from anywhere
 
-Then it writes the hook config for your agent and you're done.
+After that, type `lmc` from any directory.
 
 ## How It Works
 
@@ -44,8 +45,8 @@ Conversation → session-end hook → background flush extracts knowledge
         → next session gets index injected → cycle repeats
 ```
 
-- **Hooks** fire automatically at session end (or after each response for Windsurf)
-- **flush** calls the LLM to decide what's worth saving; triggers end-of-day compilation after 6 PM
+- **Hooks** fire automatically at session end — and at session start to inject your knowledge index as context
+- **flush** calls the LLM to decide what's worth saving; auto-triggers end-of-day compilation after 6 PM
 - **compile** turns daily logs into organized concept articles with cross-references
 - **query** answers questions using index-guided retrieval (no RAG needed at personal scale)
 - **lint** runs 7 health checks (broken links, orphans, contradictions, staleness)
@@ -53,81 +54,84 @@ Conversation → session-end hook → background flush extracts knowledge
 ## Agent Setup Details
 
 ### Claude Code
-Hooks are registered in `.claude/settings.json` in this project. Open the project in Claude Code — hooks activate automatically. SessionEnd captures each conversation; PreCompact captures context before auto-summarization.
+Hooks in `.claude/settings.json`: SessionStart injects your knowledge index as context at the start of every session; SessionEnd captures the transcript; PreCompact captures context before auto-summarization discards it.
 
 ### Cursor
-A `stop` hook in `.cursor/hooks.json` fires when a session completes. Aborted or errored sessions are skipped. Cursor's transcript format is compatible with the standard extractor.
+Three hooks in `.cursor/hooks.json`: sessionStart (context injection), sessionEnd (transcript capture, skips `reason=error`), preCompact (capture before auto-compaction, requires ≥ 5 turns). Cursor's JSONL transcript format is compatible with the standard extractor.
 
 ### Windsurf
-A global hook in `~/.codeium/windsurf/hooks.json` fires after every Cascade response (not just session end). A 60-second dedup window prevents redundant flushes.
+A global hook in `~/.codeium/windsurf/hooks.json` fires after every Cascade response (not just session end). `working_directory` is set to the KB root so `./lmc` resolves correctly. A 60-second dedup window prevents redundant flushes within one session.
 
 ### Gemini CLI / OpenAI Codex / Tabnine / Continue.dev / Qwen Code
-All share the same standard JSON hooks protocol as Claude Code. A global hook config is written to the agent's settings file. The `SessionEnd` (or `Stop` for Codex) event fires with `session_id` and `transcript_path` in the stdin payload.
+All use the standard JSON hooks protocol. A global hook config is written to the agent's settings file with the absolute path to `lmc` hardcoded (e.g. `/home/you/llm-memory-compiler/lmc hook generic-session-end`). The `SessionEnd` (or `Stop` for Codex) event delivers `session_id` and `transcript_path` in the stdin payload — the same fields our handler reads.
 
 ### Devin CLI
-Hook config goes in `.devin/hooks.v1.json` inside this project. Devin's schema is slightly different (no `"hooks"` wrapper key), but the stdin payload is the same.
+Hook config in `.devin/hooks.v1.json` inside this project. Devin's schema omits the outer `"hooks"` wrapper key, but the stdin payload is identical.
 
 ### GitHub Copilot
-Interactive Copilot Chat has no public session hooks. Run `inject-context` to push the knowledge index to `.github/copilot-instructions.md` so Copilot sees your knowledge base as context.
+Interactive Copilot Chat has no public session hooks. Run `lmc inject-context` to push the knowledge index into `.github/copilot-instructions.md` so Copilot sees your knowledge base as context.
 
 ## Unsupported Agents
 
-If your agent isn't in the table above, you can still use the knowledge base manually:
+If your agent isn't listed, you can still use the knowledge base manually:
 
 **Option 1 — Manual flush after each session**
 
-Export or copy your conversation to a file, then run:
+Export or copy your conversation to a plain text file, then:
 ```bash
-uv run llm-memory-compiler flush /path/to/conversation.txt my-session-id
+lmc flush /path/to/conversation.txt my-session-id
 ```
-The flush command reads the file, extracts knowledge, and appends it to today's daily log.
+The flush command extracts knowledge and appends it to today's daily log.
 
-**Option 2 — Inject context so your agent sees the knowledge base**
+**Option 2 — Inject context before each session**
 
-Run this before starting a session or after each compile:
+Run this after compiling or whenever you want the context refreshed:
 ```bash
-uv run llm-memory-compiler inject-context
+lmc inject-context
 ```
-This reads `knowledge/index.md` and writes it to a file your agent can pick up as context (configure the output path by selecting the closest supported agent during `init`, or add the generated file to your agent's context rules manually).
+This writes `knowledge/index.md` to your agent's context rules file. Select the closest supported agent during `init` to control where it writes.
 
 **Option 3 — Schedule periodic context injection**
 
-Add a cron job to keep your agent's context file fresh:
 ```bash
-# Runs inject-context every hour
-0 * * * * cd /path/to/llm-memory-compiler && uv run llm-memory-compiler inject-context
+# crontab -e: refresh context every hour
+0 * * * * /path/to/llm-memory-compiler/lmc inject-context
 ```
 
-**Option 4 — Add this project as your agent's context rule**
+**Option 4 — Point your agent's rules file at the index directly**
 
-Point your agent's rules file at `knowledge/index.md` directly. Most agents support an "always include" rule that you can configure to include this file automatically in every session.
-
-## LLM Provider
-
-| Provider | Credential | Use case |
-|----------|-----------|----------|
-| `claude-agent-sdk` (default) | `~/.claude/.credentials.json` | Claude Max/Team/Enterprise subscribers |
-| `anthropic-api` | `ANTHROPIC_API_KEY` env var | Everyone else; direct API billing |
-
-> Anthropic has clarified that personal use of the Claude Agent SDK is covered under existing Claude subscriptions — no separate API credits needed for the default provider.
+Most agents support an "always include" rule. Configure it to include `knowledge/index.md` from this repo — no `lmc` invocation required.
 
 ## Commands
 
 ```bash
-uv run llm-memory-compiler init                         # setup wizard (run once)
-uv run llm-memory-compiler inject-context               # push index to agent context file
+lmc init                          # setup wizard — run once, installs ~/.local/bin/lmc
+lmc inject-context                # push knowledge index to agent context file
 
-uv run llm-memory-compiler compile                      # compile new daily logs
-uv run llm-memory-compiler compile --all                # recompile everything
-uv run llm-memory-compiler compile --dry-run            # preview without running
-uv run llm-memory-compiler query "your question"        # ask the knowledge base
-uv run llm-memory-compiler query "question" --file-back # ask + save answer as Q&A article
-uv run llm-memory-compiler lint                         # run all health checks
-uv run llm-memory-compiler lint --structural-only       # free structural checks only
-uv run llm-memory-compiler flush <file> <session-id>    # manually flush a conversation
+lmc compile                       # compile new/changed daily logs
+lmc compile --all                 # force recompile everything
+lmc compile --dry-run             # preview without running
+lmc query "your question"         # ask the knowledge base
+lmc query "question" --file-back  # ask + save answer as Q&A article
+lmc lint                          # run all 7 health checks
+lmc lint --structural-only        # structural checks only (free, instant)
+lmc flush <file> <session-id>     # manually flush a conversation file
 ```
 
-Legacy `uv run python scripts/*.py` commands still work.
+Before `lmc init`, or if `lmc` isn't on PATH yet:
+```bash
+./lmc init          # repo-local wrapper, works immediately after clone
+uv run lmc init     # explicit uv invocation
+```
+
+Legacy `uv run python scripts/*.py` still works.
+
+## LLM Provider
+
+| Provider | Credential | Notes |
+|----------|-----------|-------|
+| `claude-agent-sdk` (default) | `~/.claude/.credentials.json` | Claude Max/Team/Enterprise — no separate API billing |
+| `anthropic-api` | `ANTHROPIC_API_KEY` env var | Direct API; works without Claude Code installed |
 
 ## Why No RAG?
 
@@ -135,4 +139,4 @@ Karpathy's insight: at personal scale (50–500 articles), the LLM reading a str
 
 ## Technical Reference
 
-See **[AGENTS.md](AGENTS.md)** for the complete technical reference: article formats, hook architecture, script internals, cross-platform details, costs, and customization options.
+See **[AGENTS.md](AGENTS.md)** for the complete technical reference: article formats, hook architecture, script internals, multi-agent hook protocol details, costs, and customization options.
