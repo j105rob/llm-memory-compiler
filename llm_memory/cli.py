@@ -40,10 +40,16 @@ def main() -> None:
 # ── init ──────────────────────────────────────────────────────────────
 
 _AGENTS = {
-    "1": ("claude-code", "Claude Code", "full: session hooks + auto-capture"),
-    "2": ("cursor",      "Cursor",      "context injection only"),
-    "3": ("windsurf",    "Windsurf",    "context injection only"),
-    "4": ("copilot",     "GitHub Copilot", "context injection only"),
+    "1":  ("claude-code", "Claude Code",    "session hooks (SessionEnd, PreCompact)"),
+    "2":  ("cursor",      "Cursor",         "session hooks (stop event)"),
+    "3":  ("windsurf",    "Windsurf",       "session hooks (post_cascade_response_with_transcript)"),
+    "4":  ("gemini",      "Gemini CLI",     "session hooks (SessionEnd)"),
+    "5":  ("codex",       "OpenAI Codex",   "session hooks (Stop)"),
+    "6":  ("tabnine",     "Tabnine CLI",    "session hooks (SessionEnd)"),
+    "7":  ("continue",    "Continue.dev",   "session hooks (SessionEnd)"),
+    "8":  ("qwen",        "Qwen Code",      "session hooks (SessionEnd)"),
+    "9":  ("devin",       "Devin CLI",      "session hooks (SessionEnd)"),
+    "10": ("copilot",     "GitHub Copilot", "context injection only (no session hooks)"),
 }
 
 _PROVIDERS = {
@@ -53,9 +59,9 @@ _PROVIDERS = {
 
 
 @main.command()
-@click.option("--agent", type=click.Choice(list(a[0] for a in _AGENTS.values())), default=None,
+@click.option("--agent", type=click.Choice([a[0] for a in _AGENTS.values()]), default=None,
               help="Skip interactive agent selection.")
-@click.option("--provider", type=click.Choice(list(p[0] for p in _PROVIDERS.values())), default=None,
+@click.option("--provider", type=click.Choice([p[0] for p in _PROVIDERS.values()]), default=None,
               help="Skip interactive provider selection.")
 @click.option("--knowledge-dir", default=None, help="Knowledge base directory (default: knowledge)")
 @click.option("--daily-dir", default=None, help="Daily logs directory (default: daily)")
