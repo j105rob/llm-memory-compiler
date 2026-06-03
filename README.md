@@ -22,20 +22,24 @@ Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/44
 
 ## Quick Start
 
+**Step 1 — Install lmc (once per machine)**
+
 ```bash
 git clone https://github.com/j105rob/llm-memory-compiler
 cd llm-memory-compiler
 uv sync
-./lmc init
+./lmc install
 ```
 
-`init` presents an interactive setup wizard that:
-1. Selects your AI agent from the list above
-2. Selects your LLM provider (claude-agent-sdk or Anthropic API key)
-3. Writes the hook config for that agent
-4. Installs `~/.local/bin/lmc` so you can run `lmc` from anywhere
+`install` verifies uv, syncs dependencies, and writes a launcher script to `~/.local/bin/lmc` so `lmc` is available from any directory. It will warn you if `~/.local/bin` isn't on your PATH yet.
 
-After that, type `lmc` from any directory.
+**Step 2 — Configure your project (once per knowledge base)**
+
+```bash
+lmc init
+```
+
+`init` asks which AI agent you use, which LLM provider to use for compilation, and writes the hook config for that agent. Run it from the directory you want as your knowledge base root.
 
 ## How It Works
 
@@ -105,7 +109,9 @@ Most agents support an "always include" rule. Configure it to include `knowledge
 ## Commands
 
 ```bash
-lmc init                          # setup wizard — run once, installs ~/.local/bin/lmc
+lmc install                       # install lmc globally — run once per machine
+lmc install --bin-dir ~/bin       # install to a custom directory
+lmc init                          # configure this project — select agent + write hook config
 lmc inject-context                # push knowledge index to agent context file
 
 lmc compile                       # compile new/changed daily logs

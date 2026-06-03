@@ -338,15 +338,30 @@ llm-memory-compiler/
 ```bash
 ./lmc <cmd>                   # repo-local wrapper (works immediately after clone)
 uv run lmc <cmd>              # explicit uv invocation
-lmc <cmd>                     # after lmc init installs ~/.local/bin/lmc
+lmc <cmd>                     # after lmc install writes ~/.local/bin/lmc
 ```
 
-`lmc init` writes `~/.local/bin/lmc` — a generated script that hardcodes the KB's absolute path:
+### Installation vs. Initialisation
+
+These are separate steps run in order:
+
+```bash
+# 1. Install once per machine
+./lmc install          # writes ~/.local/bin/lmc; verifies uv; syncs deps
+
+# 2. Configure once per knowledge base
+lmc init               # selects agent + LLM provider; writes hook config
+```
+
+`lmc install` writes `~/.local/bin/lmc` — a generated launcher script with the KB's absolute path hardcoded:
 
 ```bash
 #!/usr/bin/env bash
+# lmc — LLM Memory Compiler
 exec uv run --directory /abs/path/to/llm-memory-compiler lmc "$@"
 ```
+
+A custom install location is supported: `lmc install --bin-dir ~/bin`.
 
 `lmc_cmd()` in `config.py` is used by all background subprocess spawns: returns `["lmc"]` if `lmc` is on PATH, otherwise `["uv", "run", "--directory", ROOT_DIR, "lmc"]`.
 
@@ -503,6 +518,7 @@ Both extractors live in `llm_memory/transcript.py`.
 ## CLI Reference
 
 ```bash
+lmc install [--bin-dir DIR]
 lmc init [--agent AGENT] [--provider PROVIDER] [--knowledge-dir DIR] [--daily-dir DIR]
 lmc compile [--all] [--file PATH] [--dry-run]
 lmc query QUESTION [--file-back]
@@ -511,9 +527,13 @@ lmc flush CONTEXT_FILE SESSION_ID
 lmc inject-context
 ```
 
+### `lmc install`
+
+Verifies uv, syncs dependencies, writes the `lmc` launcher script to `~/.local/bin/` (or `--bin-dir`), and reports PATH status. Run once per machine after cloning.
+
 ### `lmc init`
 
-Writes `.llm-memory/config.json`, installs agent hooks, and writes `~/.local/bin/lmc`. Supports 10 agents:
+Writes `.llm-memory/config.json` and installs agent hook config. Supports 10 agents:
 `claude-code`, `cursor`, `windsurf`, `gemini`, `codex`, `tabnine`, `continue`, `qwen`, `devin`, `copilot`.
 
 Non-interactive: `lmc init --agent cursor --provider anthropic-api`
