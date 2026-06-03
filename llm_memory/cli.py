@@ -5,9 +5,58 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 import click
+from rich.align import Align
+from rich.console import Console
+from rich.rule import Rule
+from rich.text import Text
+
+_console = Console()
+
+# Block-letter ASCII art for "LMC" (L · M · C)
+_BANNER_LINES = [
+    "██╗     ███╗   ███╗  ██████╗",
+    "██║     ████╗ ████║ ██╔════╝",
+    "██║     ██╔████╔██║ ██║     ",
+    "██║     ██║╚██╔╝██║ ██║     ",
+    "███████╗██║ ╚═╝ ██║ ╚██████╗",
+    "╚══════╝╚═╝     ╚═╝  ╚═════╝",
+]
+
+# Purple → blue → cyan gradient, mirrored top-to-bottom
+_GRADIENT = [
+    "bold bright_magenta",
+    "bold magenta",
+    "bold bright_blue",
+    "bold bright_blue",
+    "bold cyan",
+    "bold bright_cyan",
+]
+
+
+def _print_banner() -> None:
+    try:
+        ver = _pkg_version("llm-memory-compiler")
+    except Exception:
+        ver = "0.2.0"
+
+    _console.print()
+    for line, style in zip(_BANNER_LINES, _GRADIENT):
+        _console.print(Align.center(Text(line, style=style)))
+    _console.print()
+    title = Text.assemble(
+        ("LLM Memory Compiler", "bold white"),
+        ("  ·  ", "dim"),
+        (f"v{ver}", "dim cyan"),
+    )
+    _console.print(Align.center(title))
+    _console.print(Align.center(Text("Your AI conversations, compiled.", style="italic dim")))
+    _console.print()
+    _console.print(Rule(style="dim"))
+    _console.print()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -26,7 +75,7 @@ def _migrate_state(project_root: Path) -> None:
     new_state = project_root / ".llm-memory" / "state.json"
     if old_state.exists() and not new_state.exists():
         shutil.copy2(old_state, new_state)
-        click.echo(f"  Migrated state: scripts/state.json → .llm-memory/state.json")
+        _console.print("  [green]✓[/green] Migrated state: scripts/state.json → .llm-memory/state.json")
 
 
 # ── CLI group ─────────────────────────────────────────────────────────
@@ -70,10 +119,13 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
     project_root = Path.cwd()
     is_tty = sys.stdin.isatty()
 
+    if is_tty:
+        _print_banner()
+
     # Detect existing setup for migration messaging
     existing_config = project_root / ".llm-memory" / "config.json"
     if existing_config.exists():
-        click.echo("Existing config detected — reconfiguring.")
+        _console.print("[dim]Existing config detected — reconfiguring.[/dim]")
 
     # ── Agent selection ──
     if agent is None:
@@ -120,7 +172,7 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
         "daily_dir": daily_dir,
     }
     config_file = _write_config(project_root, config_data)
-    click.echo(f"\n  Wrote {config_file.relative_to(project_root)}")
+    _console.print(f"  [green]✓[/green] Wrote [cyan]{config_file.relative_to(project_root)}[/cyan]")
 
     # Migrate existing state if present
     _migrate_state(project_root)
@@ -135,19 +187,24 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
             label = f.relative_to(project_root)
         except ValueError:
             label = f  # outside project root (e.g. global ~/.codeium/ config)
-        click.echo(f"  Wrote {label}")
+        _console.print(f"  [green]✓[/green] Wrote [cyan]{label}[/cyan]")
 
     # ── Sync dependencies ──
     import subprocess
     try:
         subprocess.run(["uv", "sync"], cwd=str(project_root), check=True, capture_output=True)
-        click.echo("  Ran uv sync")
+        _console.print("  [green]✓[/green] Ran uv sync")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        click.echo("  Note: run 'uv sync' to install dependencies")
+        _console.print("  [yellow]![/yellow] Run [cyan]uv sync[/cyan] to install dependencies")
 
-    click.echo("\nSetup complete.")
+    _console.print()
+    _console.print(Rule(style="dim"))
+    _console.print()
+    _console.print(Align.center(Text("Setup complete!", style="bold green")))
+    _console.print()
     for step in result.manual_steps:
-        click.echo(f"  • {step}")
+        _console.print(f"  [cyan]→[/cyan] {step}")
+    _console.print()
 
 
 # ── compile ───────────────────────────────────────────────────────────
