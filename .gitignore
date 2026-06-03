@@ -11,6 +11,14 @@ scripts/compile.log
 scripts/session-flush-*
 scripts/flush-context-*
 
+# llm-memory runtime state
+.llm-memory/state.json
+.llm-memory/last-flush.json
+.llm-memory/flush.log
+.llm-memory/compile.log
+.llm-memory/session-flush-*
+.llm-memory/flush-context-*
+
 # Generated content (built up per-user by hooks and scripts)
 daily/
 knowledge/

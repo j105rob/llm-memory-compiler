@@ -1,52 +1,72 @@
-# LLM Personal Knowledge Base
+# LLM Memory Compiler
 
 **Your AI conversations compile themselves into a searchable knowledge base.**
 
-Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) architecture, but instead of clipping web articles, the raw data is your own conversations with Claude Code. When a session ends (or auto-compacts mid-session), Claude Code hooks capture the conversation transcript and spawn a background process that uses the [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk) to extract the important stuff - decisions, lessons learned, patterns, gotchas - and appends it to a daily log. You then compile those daily logs into structured, cross-referenced knowledge articles organized by concept. Retrieval uses a simple index file instead of RAG - no vector database, no embeddings, just markdown.
+Adapted from [Karpathy's LLM Knowledge Base](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) architecture. When a session ends, hooks capture the conversation transcript and a background process uses an LLM to extract decisions, lessons, patterns, and gotchas into a daily log. Those logs compile into structured, cross-referenced knowledge articles. Retrieval uses a simple index file — no vector database, no embeddings, just markdown.
 
-Anthropic has clarified that personal use of the Claude Agent SDK is covered under your existing Claude subscription (Max, Team, or Enterprise) - no separate API credits needed. Unlike OpenClaw, which requires API billing for its memory flush, this runs on your subscription.
+Works with **Claude Code** (full auto-capture via session hooks), **Cursor**, **Windsurf**, and **GitHub Copilot** (context injection).
 
 ## Quick Start
 
-Tell your AI coding agent:
+```bash
+git clone https://github.com/j105rob/llm-memory-compiler
+cd llm-memory-compiler
+uv sync
+uv run llm-memory-compiler init
+```
 
-> "Clone https://github.com/j105rob/llm-memory-compiler into this project. Set up the Agent hooks so my conversations automatically get captured into daily logs, compiled into a knowledge base, and injected back into future sessions. Read the AGENTS.md for the full technical reference on how everything works."
+The `init` command walks you through:
+1. **Select your AI agent** — Claude Code, Cursor, Windsurf, or GitHub Copilot
+2. **Select your LLM provider** — claude-agent-sdk (uses your Claude subscription) or Anthropic API key
+3. **Configure directories** — where to store daily logs and knowledge articles
 
-The agent will:
-1. Clone the repo and run `uv sync` to install dependencies
-2. Copy `.claude/settings.json` into your project (or merge the hooks into your existing settings)
-3. The hooks activate automatically next time you open Claude Code
+For **Claude Code**: hooks activate automatically next time you open the project. After 6 PM local time, the next session automatically triggers end-of-day compilation.
 
-From there, your conversations start accumulating. After 6 PM local time, the next session flush automatically triggers compilation of that day's logs into knowledge articles. You can also run `uv run python scripts/compile.py` manually at any time.
+For **Cursor / Windsurf / Copilot**: run `uv run llm-memory-compiler inject-context` to push the knowledge index into your agent's context rules file. Re-run after each compile to keep it fresh.
 
 ## How It Works
 
 ```
-Conversation -> SessionEnd/PreCompact hooks -> flush.py extracts knowledge
-    -> daily/YYYY-MM-DD.md -> compile.py -> knowledge/concepts/, connections/, qa/
-        -> SessionStart hook injects index into next session -> cycle repeats
+Conversation → SessionEnd/PreCompact hooks → flush extracts knowledge
+    → daily/YYYY-MM-DD.md → compile → knowledge/concepts/, connections/, qa/
+        → SessionStart hook injects index into next session → cycle repeats
 ```
 
-- **Hooks** capture conversations automatically (session end + pre-compaction safety net)
-- **flush.py** calls the Claude Agent SDK to decide what's worth saving, and after 6 PM triggers end-of-day compilation automatically
-- **compile.py** turns daily logs into organized concept articles with cross-references (triggered automatically or run manually)
-- **query.py** answers questions using index-guided retrieval (no RAG needed at personal scale)
-- **lint.py** runs 7 health checks (broken links, orphans, contradictions, staleness)
+- **Hooks** (Claude Code only) capture conversations automatically at session end and before compaction
+- **flush** calls the LLM to decide what's worth saving; triggers end-of-day compilation automatically after 6 PM
+- **compile** turns daily logs into organized concept articles with cross-references
+- **query** answers questions using index-guided retrieval (no RAG needed at personal scale)
+- **lint** runs 7 health checks (broken links, orphans, contradictions, staleness)
 
-## Key Commands
+## Commands
 
 ```bash
-uv run python scripts/compile.py                    # compile new daily logs
-uv run python scripts/query.py "question"            # ask the knowledge base
-uv run python scripts/query.py "question" --file-back # ask + save answer back
-uv run python scripts/lint.py                        # run health checks
-uv run python scripts/lint.py --structural-only      # free structural checks only
+uv run llm-memory-compiler init                         # setup wizard (run once)
+uv run llm-memory-compiler inject-context               # push index to agent context file
+
+uv run llm-memory-compiler compile                      # compile new daily logs
+uv run llm-memory-compiler compile --all                # recompile everything
+uv run llm-memory-compiler query "your question"        # ask the knowledge base
+uv run llm-memory-compiler query "question" --file-back # ask + save answer as Q&A article
+uv run llm-memory-compiler lint                         # run all health checks
+uv run llm-memory-compiler lint --structural-only       # free structural checks only
 ```
+
+Legacy `uv run python scripts/*.py` commands still work.
+
+## LLM Provider
+
+| Provider | Credential | Notes |
+|----------|-----------|-------|
+| `claude-agent-sdk` (default) | `~/.claude/.credentials.json` | Uses your Claude Max/Team/Enterprise subscription |
+| `anthropic-api` | `ANTHROPIC_API_KEY` env var | Direct API billing; works without Claude Code installed |
+
+Anthropic has clarified that personal use of the Claude Agent SDK is covered under your existing Claude subscription — no separate API credits needed for the default provider.
 
 ## Why No RAG?
 
-Karpathy's insight: at personal scale (50-500 articles), the LLM reading a structured `index.md` outperforms vector similarity. The LLM understands what you're really asking; cosine similarity just finds similar words. RAG becomes necessary at ~2,000+ articles when the index exceeds the context window.
+Karpathy's insight: at personal scale (50–500 articles), the LLM reading a structured `index.md` outperforms vector similarity. The LLM understands what you're really asking; cosine similarity just finds similar words. RAG becomes necessary at ~2,000+ articles when the index exceeds the context window.
 
 ## Technical Reference
 
-See **[AGENTS.md](AGENTS.md)** for the complete technical reference: article formats, hook architecture, script internals, cross-platform details, costs, and customization options. AGENTS.md is designed to give an AI agent everything it needs to understand, modify, or rebuild the system.
+See **[AGENTS.md](AGENTS.md)** for the complete technical reference: article formats, hook architecture, script internals, cross-platform details, costs, and customization options.
