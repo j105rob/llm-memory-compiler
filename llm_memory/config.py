@@ -58,6 +58,7 @@ LMC_HOME = Path.home() / ".lmc"
 TIMEZONE = _cfg.get("timezone", "America/Chicago")
 CONFIGURED_AGENT = _cfg.get("agent", "claude-code")
 API_PROVIDER = _cfg.get("api_provider", "claude-agent-sdk")
+MODEL = _cfg.get("model", "claude-sonnet-4-6")
 
 
 def lmc_cmd() -> list[str]:

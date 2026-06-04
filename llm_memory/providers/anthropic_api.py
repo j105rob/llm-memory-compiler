@@ -5,9 +5,6 @@ import os
 
 from llm_memory.providers.base import LLMProvider
 
-_DEFAULT_MODEL = "claude-opus-4-5-20251101"
-
-
 class AnthropicAPIProvider(LLMProvider):
     def __init__(self) -> None:
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -41,9 +38,10 @@ class AnthropicAPIProvider(LLMProvider):
             ) from e
 
         def _sync_call() -> tuple[str, float]:
+            from llm_memory.config import MODEL
             client = anthropic.Anthropic(api_key=self.api_key)
             response = client.messages.create(
-                model=_DEFAULT_MODEL,
+                model=MODEL,
                 max_tokens=8096,
                 messages=[{"role": "user", "content": prompt}],
             )

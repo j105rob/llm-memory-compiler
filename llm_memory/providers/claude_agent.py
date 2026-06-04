@@ -21,7 +21,8 @@ class ClaudeAgentProvider(LLMProvider):
             query,
         )
 
-        opts: dict = {"cwd": cwd, "allowed_tools": allowed_tools, "max_turns": max_turns}
+        from llm_memory.config import MODEL
+        opts: dict = {"cwd": cwd, "allowed_tools": allowed_tools, "max_turns": max_turns, "model": MODEL}
         if use_code_preset:
             opts["system_prompt"] = {"type": "preset", "preset": "claude_code"}
             opts["permission_mode"] = "acceptEdits"

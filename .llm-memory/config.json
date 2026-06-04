@@ -2,5 +2,6 @@
   "agent": "claude-code",
   "api_provider": "claude-agent-sdk",
   "knowledge_dir": "llm-memory/knowledge",
-  "daily_dir": "llm-memory/daily"
+  "daily_dir": "llm-memory/daily",
+  "model": "claude-sonnet-4-6"
 }

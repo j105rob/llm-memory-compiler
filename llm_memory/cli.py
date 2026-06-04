@@ -234,15 +234,23 @@ _PROVIDERS = {
     "2": ("anthropic-api",    "uses ANTHROPIC_API_KEY env var"),
 }
 
+_MODELS = {
+    "1": ("claude-haiku-4-5",   "fastest, lowest cost — good for high-frequency flushes"),
+    "2": ("claude-sonnet-4-6",  "balanced speed and quality (recommended)"),
+    "3": ("claude-opus-4-8",    "highest quality, higher cost — best for compile/query"),
+}
+
 
 @main.command()
 @click.option("--agent", type=click.Choice([a[0] for a in _AGENTS.values()]), default=None,
               help="Skip interactive agent selection.")
 @click.option("--provider", type=click.Choice([p[0] for p in _PROVIDERS.values()]), default=None,
               help="Skip interactive provider selection.")
+@click.option("--model", type=click.Choice([m[0] for m in _MODELS.values()]), default=None,
+              help="LLM model for flush/compile/query.")
 @click.option("--knowledge-dir", default=None, help="Knowledge base directory (default: knowledge)")
 @click.option("--daily-dir", default=None, help="Daily logs directory (default: daily)")
-def init(agent: str | None, provider: str | None, knowledge_dir: str | None, daily_dir: str | None) -> None:
+def init(agent: str | None, provider: str | None, model: str | None, knowledge_dir: str | None, daily_dir: str | None) -> None:
     """Configure lmc for this project — select agent, write hook config.
 
     Run `lmc install` first to make lmc available system-wide, then run
@@ -287,6 +295,20 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
         else:
             provider = "claude-agent-sdk"
 
+    # ── Model selection ──
+    if model is None:
+        if is_tty:
+            click.echo("\nSelect model for flush/compile/query:")
+            for num, (key, desc) in _MODELS.items():
+                click.echo(f"  {num}. {key:28} [{desc}]")
+            choice = click.prompt("Model", default="2")
+            model_entry = _MODELS.get(choice)
+            if model_entry is None:
+                raise click.BadParameter(f"Choose 1-{len(_MODELS)}")
+            model = model_entry[0]
+        else:
+            model = "claude-sonnet-4-6"
+
     # ── Directories ──
     if knowledge_dir is None and is_tty:
         knowledge_dir = click.prompt("Knowledge directory", default="llm-memory/knowledge")
@@ -300,6 +322,7 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
     config_data = {
         "agent": agent,
         "api_provider": provider,
+        "model": model,
         "knowledge_dir": knowledge_dir,
         "daily_dir": daily_dir,
     }
@@ -551,7 +574,7 @@ def test_pipeline(no_write: bool) -> None:
     import asyncio
     from llm_memory.config import (
         AGENTS_FILE, CONFIGURED_AGENT, DAILY_DIR, KNOWLEDGE_DIR,
-        LMC_CONTENT_DIR, ROOT_DIR, STATE_DIR,
+        LMC_CONTENT_DIR, MODEL, ROOT_DIR, STATE_DIR,
     )
 
     _console.print()
@@ -564,7 +587,7 @@ def test_pipeline(no_write: bool) -> None:
     config_file = ROOT_DIR / ".llm-memory" / "config.json"
     if config_file.exists():
         _console.print(f"  [green]✓[/green] Config        {config_file}")
-        _console.print(f"           agent=[cyan]{CONFIGURED_AGENT}[/cyan]   kb={ROOT_DIR}")
+        _console.print(f"           agent=[cyan]{CONFIGURED_AGENT}[/cyan]   model=[cyan]{MODEL}[/cyan]   kb={ROOT_DIR}")
     else:
         _console.print(f"  [red]✗[/red] No config at {config_file} — run [bold]lmc init[/bold] first")
         ok = False
