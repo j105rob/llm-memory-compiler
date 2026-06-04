@@ -27,8 +27,17 @@ anthropic = [
 llm-memory-compiler = "llm_memory.cli:main"
 lmc = "llm_memory.cli:main"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+]
+
 [tool.uv]
 package = true
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

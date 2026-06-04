@@ -23,13 +23,13 @@ def extract_conversation_context(transcript_path: Path) -> tuple[str, int]:
             except json.JSONDecodeError:
                 continue
 
-            msg = entry.get("message", {})
-            if isinstance(msg, dict):
-                role = msg.get("role", "")
-                content = msg.get("content", "")
-            else:
-                role = entry.get("role", "")
-                content = entry.get("content", "")
+            # Support both Claude Code format {"message": {"role": ..., "content": ...}}
+            # and flat format {"role": ..., "content": ...} used by some agents.
+            msg = entry.get("message") or entry
+            if not isinstance(msg, dict):
+                continue
+            role = msg.get("role", "")
+            content = msg.get("content", "")
 
             if role not in ("user", "assistant"):
                 continue
