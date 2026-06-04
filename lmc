@@ -3,5 +3,5 @@
 # Local wrapper: runs lmc via uv. LMC_KB_ROOT captures the caller's working
 # directory so config.py uses it as the knowledge base root, not the repo root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export LMC_KB_ROOT="$(pwd)"
+export LMC_KB_ROOT="${LMC_KB_ROOT:-$(pwd)}"
 exec uv run --directory "$SCRIPT_DIR" lmc "$@"

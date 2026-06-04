@@ -61,6 +61,7 @@ def main() -> None:
         hook_input.get("transcript_path")
         or os.environ.get("CURSOR_TRANSCRIPT_PATH", "")
     )
+    logging.info("transcript_path=%s", transcript_path_str or "(none)")
     if not transcript_path_str:
         logging.info("SKIP: no transcript path")
         return
@@ -70,12 +71,20 @@ def main() -> None:
         logging.info("SKIP: transcript not found: %s", transcript_path_str)
         return
 
+    # Log a sample of the transcript so format issues are diagnosable
+    try:
+        sample = transcript_path.read_text(encoding="utf-8")[:500]
+        logging.info("transcript sample (first 500 chars): %s", sample.replace("\n", " ↵ "))
+    except Exception:
+        pass
+
     try:
         context, turn_count = extract_conversation_context(transcript_path)
     except Exception as e:
         logging.error("Context extraction failed: %s", e)
         return
 
+    logging.info("extracted %d turns", turn_count)
     if not context.strip() or turn_count < MIN_TURNS_TO_FLUSH:
         logging.info("SKIP: only %d turns", turn_count)
         return

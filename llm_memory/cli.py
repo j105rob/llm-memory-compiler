@@ -71,7 +71,7 @@ def _write_lmc_script(project_root: Path, bin_dir: Path) -> Path:
         f"#!/usr/bin/env bash\n"
         f"# lmc — LLM Memory Compiler\n"
         f"# LMC_KB_ROOT captures the caller's cwd so commands run in the right directory.\n"
-        f"export LMC_KB_ROOT=\"$(pwd)\"\n"
+        f"export LMC_KB_ROOT=\"${{LMC_KB_ROOT:-$(pwd)}}\"\n"
         f"exec uv run --directory {project_root} lmc \"$@\"\n",
         encoding="utf-8",
     )
@@ -520,6 +520,122 @@ def inject_context() -> None:
     target = adapter.write_context_file(project_root, context)
     rel = target.relative_to(project_root) if target.is_absolute() else target
     click.echo(f"Injected {len(context):,} chars → {rel}")
+
+
+# ── test ─────────────────────────────────────────────────────────────
+
+_TEST_CONTEXT = """\
+**User:** What's the best way to structure error handling in async Python?
+
+**Assistant:** For async code I recommend three layers: use try/except around
+individual awaits for recoverable errors, a top-level asyncio.run() wrapper
+for fatal errors, and structured logging throughout so failures are traceable.
+Key insight: never swallow exceptions silently in async callbacks.
+
+**User:** Should I use contextlib.suppress?
+
+**Assistant:** Only for genuinely ignorable errors — cancelled tasks, optional
+cleanup — and always at the narrowest scope. If you find yourself suppressing
+something and then checking a flag, that's a sign the error actually matters.
+"""
+
+@main.command("test")
+@click.option("--no-write", is_flag=True, help="Test the provider without writing to the daily log.")
+def test_pipeline(no_write: bool) -> None:
+    """Run an end-to-end test of the lmc pipeline with real credentials.
+
+    Checks prerequisites, calls the LLM provider, and (unless --no-write)
+    flushes a sample conversation into the daily log so you can verify the
+    full hook → flush → daily-log path is working.
+    """
+    import asyncio
+    from llm_memory.config import (
+        AGENTS_FILE, CONFIGURED_AGENT, DAILY_DIR, KNOWLEDGE_DIR,
+        LMC_CONTENT_DIR, ROOT_DIR, STATE_DIR,
+    )
+
+    _console.print()
+    _console.print(Rule("[bold]lmc test[/bold]", style="cyan"))
+    _console.print()
+
+    ok = True
+
+    # ── 1. Config ──
+    config_file = ROOT_DIR / ".llm-memory" / "config.json"
+    if config_file.exists():
+        _console.print(f"  [green]✓[/green] Config        {config_file}")
+        _console.print(f"           agent=[cyan]{CONFIGURED_AGENT}[/cyan]   kb={ROOT_DIR}")
+    else:
+        _console.print(f"  [red]✗[/red] No config at {config_file} — run [bold]lmc init[/bold] first")
+        ok = False
+
+    # ── 2. Directory structure ──
+    for label, path in [("AGENTS.md", AGENTS_FILE), ("daily/", DAILY_DIR), ("knowledge/", KNOWLEDGE_DIR)]:
+        if path.exists():
+            _console.print(f"  [green]✓[/green] {label:<14}{path}")
+        else:
+            _console.print(f"  [red]✗[/red] Missing: {path}")
+            ok = False
+
+    if not ok:
+        _console.print("\n  [red]Fix the issues above before testing the provider.[/red]\n")
+        raise SystemExit(1)
+
+    # ── 3. Provider call ──
+    _console.print()
+    _console.print("  Calling LLM provider…", end="")
+    try:
+        from llm_memory.providers import get_provider
+        provider = get_provider()
+        response, cost = asyncio.run(provider.call(
+            "Respond with exactly: PROVIDER_OK",
+            allowed_tools=[],
+            max_turns=2,
+            cwd=str(ROOT_DIR),
+        ))
+        if "PROVIDER_OK" in response:
+            _console.print(f" [green]✓[/green]  (${cost:.4f})")
+        else:
+            _console.print(f" [yellow]![/yellow]  unexpected response: {response[:80]!r}")
+    except Exception as e:
+        _console.print(f"\n  [red]✗[/red] Provider error: {e}")
+        raise SystemExit(1)
+
+    if no_write:
+        _console.print()
+        _console.print("  [dim]--no-write: skipping flush.[/dim]")
+        _console.print(Rule(style="dim"))
+        _console.print(Align.center(Text("Provider OK", style="bold green")))
+        _console.print()
+        return
+
+    # ── 4. Flush test ──
+    _console.print("  Running flush with sample conversation…")
+    from llm_memory.flush import run_flush, append_to_daily_log
+    try:
+        result = asyncio.run(run_flush(_TEST_CONTEXT, ROOT_DIR))
+    except Exception as e:
+        _console.print(f"  [red]✗[/red] Flush error: {e}")
+        raise SystemExit(1)
+
+    _console.print()
+    _console.print("  [bold]Flush result:[/bold]")
+    _console.print(Rule(style="dim"))
+    _console.print(result)
+    _console.print(Rule(style="dim"))
+
+    if not no_write:
+        if "FLUSH_OK" in result:
+            append_to_daily_log(DAILY_DIR, "FLUSH_OK - test session (nothing to save)", "lmc test")
+        else:
+            append_to_daily_log(DAILY_DIR, result, "lmc test")
+        daily_log = DAILY_DIR / f"{__import__('datetime').date.today()}.md"
+        _console.print(f"\n  [green]✓[/green] Written to [cyan]{daily_log}[/cyan]")
+
+    _console.print()
+    _console.print(Rule(style="dim"))
+    _console.print(Align.center(Text("All checks passed ✓", style="bold green")))
+    _console.print()
 
 
 if __name__ == "__main__":
