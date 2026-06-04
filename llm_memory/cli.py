@@ -71,7 +71,8 @@ def _write_lmc_script(project_root: Path, bin_dir: Path) -> Path:
         f"#!/usr/bin/env bash\n"
         f"# lmc — LLM Memory Compiler\n"
         f"# LMC_KB_ROOT captures the caller's cwd so commands run in the right directory.\n"
-        f"exec LMC_KB_ROOT=\"$(pwd)\" uv run --directory {project_root} lmc \"$@\"\n",
+        f"export LMC_KB_ROOT=\"$(pwd)\"\n"
+        f"exec uv run --directory {project_root} lmc \"$@\"\n",
         encoding="utf-8",
     )
     lmc_script.chmod(lmc_script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
