@@ -103,6 +103,20 @@ class TestExtractConversationContext:
         assert "Flat format question" in context
         assert count == 2
 
+    def test_cursor_format(self, tmp_path):
+        """Cursor puts role at top level and content inside message.content (list)."""
+        t = tmp_path / "transcript.jsonl"
+        _write_transcript(t, [
+            {"role": "user",      "message": {"content": [{"type": "text", "text": "How do decorators work?"}]}, "uuid": "1"},
+            {"role": "assistant", "message": {"content": [{"type": "text", "text": "A decorator wraps a function..."}]}, "uuid": "2"},
+            {"role": "user",      "message": {"content": [{"type": "text", "text": "Can you show an example?"}]}, "uuid": "3"},
+        ])
+        context, count = extract_conversation_context(t)
+        assert "How do decorators work?" in context
+        assert "A decorator wraps a function" in context
+        assert "Can you show an example?" in context
+        assert count == 3
+
 
 class TestExtractWindsurfContext:
     def test_basic_windsurf_turns(self, tmp_path):
