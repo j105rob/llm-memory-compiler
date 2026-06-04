@@ -70,7 +70,8 @@ def _write_lmc_script(project_root: Path, bin_dir: Path) -> Path:
     lmc_script.write_text(
         f"#!/usr/bin/env bash\n"
         f"# lmc — LLM Memory Compiler\n"
-        f"exec uv run --directory {project_root} lmc \"$@\"\n",
+        f"# LMC_KB_ROOT captures the caller's cwd so commands run in the right directory.\n"
+        f"exec LMC_KB_ROOT=\"$(pwd)\" uv run --directory {project_root} lmc \"$@\"\n",
         encoding="utf-8",
     )
     lmc_script.chmod(lmc_script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
@@ -80,6 +81,13 @@ def _write_lmc_script(project_root: Path, bin_dir: Path) -> Path:
 def _bin_dir_on_path(bin_dir: Path) -> bool:
     import os
     return str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
+
+
+def _kb_root() -> Path:
+    """Return the knowledge base root: LMC_KB_ROOT env var if set, else cwd."""
+    import os
+    r = os.environ.get("LMC_KB_ROOT")
+    return Path(r).resolve() if r else Path.cwd()
 
 
 def _write_config(project_root: Path, data: dict) -> Path:
@@ -163,6 +171,18 @@ def install(bin_dir: str | None) -> None:
     lmc_script = _write_lmc_script(project_root, target_dir)
     _console.print(f"  [green]✓[/green] Wrote [cyan]{lmc_script}[/cyan]")
 
+    # ── Create ~/.lmc home directory ──
+    from llm_memory.config import LMC_HOME
+    import datetime as _dt
+    LMC_HOME.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "version": "0.2.0",
+        "installed_from": str(project_root),
+        "installed_at": _dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    (LMC_HOME / "install.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
+    _console.print(f"  [green]✓[/green] Created [cyan]{LMC_HOME}[/cyan]")
+
     # ── PATH check ──
     if not _bin_dir_on_path(target_dir):
         _console.print(
@@ -219,7 +239,7 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
     Run `lmc install` first to make lmc available system-wide, then run
     `lmc init` from your knowledge base directory to configure it.
     """
-    project_root = Path.cwd()
+    project_root = _kb_root()
     is_tty = sys.stdin.isatty()
 
     if is_tty:
@@ -305,9 +325,17 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
 # ── hook (internal dispatcher for agent hook commands) ────────────────
 
 @main.group(hidden=True)
-def hook() -> None:
+@click.option(
+    "--kb-root",
+    default=None,
+    help="Knowledge base root directory. Overrides the CWD-derived default.",
+)
+def hook(kb_root: str | None) -> None:
     """Internal dispatcher — called by agent hook commands (not for direct use)."""
-    pass
+    import os
+    if kb_root:
+        # Set before any hook module imports llm_memory.config (lazy import via _run_hook).
+        os.environ["LMC_KB_ROOT"] = str(Path(kb_root).resolve())
 
 
 def _run_hook(module_path: str) -> None:
@@ -444,7 +472,7 @@ def inject_context() -> None:
     from llm_memory.session_start import build_context
     from llm_memory.agents import get_agent
 
-    project_root = Path.cwd()
+    project_root = _kb_root()
     context = build_context(KNOWLEDGE_DIR, DAILY_DIR)
 
     try:

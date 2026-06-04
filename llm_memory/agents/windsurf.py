@@ -22,7 +22,7 @@ class WindsurfAdapter(AgentAdapter):
         hooks_file = hooks_dir / "hooks.json"
 
         hook_entry = {
-            "command": "./lmc hook windsurf",
+            "command": f"lmc hook --kb-root {project_root} windsurf",
             "working_directory": str(project_root),
         }
 

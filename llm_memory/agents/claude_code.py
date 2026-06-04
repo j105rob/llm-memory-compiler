@@ -7,46 +7,16 @@ from pathlib import Path
 
 from llm_memory.agents.base import AgentAdapter, InstallResult
 
-_SETTINGS_TEMPLATE = {
-    "hooks": {
-        "SessionStart": [
-            {
-                "matcher": "",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./lmc hook session-start",
-                        "timeout": 15,
-                    }
-                ],
-            }
-        ],
-        "PreCompact": [
-            {
-                "matcher": "",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./lmc hook pre-compact",
-                        "timeout": 10,
-                    }
-                ],
-            }
-        ],
-        "SessionEnd": [
-            {
-                "matcher": "",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./lmc hook session-end",
-                        "timeout": 10,
-                    }
-                ],
-            }
-        ],
+
+def _settings_for(kb_root: Path) -> dict:
+    r = str(kb_root)
+    return {
+        "hooks": {
+            "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": f"lmc hook --kb-root {r} session-start", "timeout": 15}]}],
+            "PreCompact":   [{"matcher": "", "hooks": [{"type": "command", "command": f"lmc hook --kb-root {r} pre-compact",   "timeout": 10}]}],
+            "SessionEnd":   [{"matcher": "", "hooks": [{"type": "command", "command": f"lmc hook --kb-root {r} session-end",   "timeout": 10}]}],
+        }
     }
-}
 
 
 class ClaudeCodeAdapter(AgentAdapter):
@@ -57,17 +27,18 @@ class ClaudeCodeAdapter(AgentAdapter):
     def install(self, project_root: Path) -> InstallResult:
         settings_dir = project_root / ".claude"
         settings_file = settings_dir / "settings.json"
+        template = _settings_for(project_root)
 
         if settings_file.exists():
             try:
                 existing = json.loads(settings_file.read_text(encoding="utf-8"))
-                existing.setdefault("hooks", {}).update(_SETTINGS_TEMPLATE["hooks"])
+                existing.setdefault("hooks", {}).update(template["hooks"])
                 merged = existing
             except (json.JSONDecodeError, OSError):
-                merged = _SETTINGS_TEMPLATE
+                merged = template
         else:
             settings_dir.mkdir(parents=True, exist_ok=True)
-            merged = _SETTINGS_TEMPLATE
+            merged = template
 
         settings_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
 

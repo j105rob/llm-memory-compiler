@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run python hooks/session-start.py",
+            "command": "lmc hook --kb-root /media/ubuntu/store/git/llm-memory-compiler session-start",
             "timeout": 15
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run python hooks/pre-compact.py",
+            "command": "lmc hook --kb-root /media/ubuntu/store/git/llm-memory-compiler pre-compact",
             "timeout": 10
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run python hooks/session-end.py",
+            "command": "lmc hook --kb-root /media/ubuntu/store/git/llm-memory-compiler session-end",
             "timeout": 10
           }
         ]

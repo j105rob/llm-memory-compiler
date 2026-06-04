@@ -50,10 +50,11 @@ class StandardHookAdapter(AgentAdapter):
     hook_event: str = "SessionEnd"
 
     def _hook_command(self, project_root: Path) -> str:
-        # Use the absolute path to lmc so this command works from any CWD
-        # (global hooks run from the user's project, not the KB root).
+        # Use the absolute lmc path + --kb-root so this works from any CWD.
+        # Global hooks (Gemini, Codex, etc.) fire from the user's project dir,
+        # not the KB root, so --kb-root must be explicit.
         lmc = project_root / "lmc"
-        return f"{lmc} hook generic-session-end"
+        return f"{lmc} hook --kb-root {project_root} generic-session-end"
 
     def _config_file(self, project_root: Path) -> Path:
         raise NotImplementedError

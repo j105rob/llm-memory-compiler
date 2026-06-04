@@ -22,8 +22,7 @@ class DevinAdapter(StandardHookAdapter):
         return project_root / ".devin" / "hooks.v1.json"
 
     def _hook_command(self, project_root: Path) -> str:
-        # Devin is project-level; ./lmc works since CWD is the KB root
-        return "./lmc hook generic-session-end"
+        return f"lmc hook --kb-root {project_root} generic-session-end"
 
     def _build_hooks_entry(self, project_root: Path) -> dict:
         # Devin's hooks.v1.json has NO "hooks" wrapper — event names are top-level

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # lmc — LLM Memory Compiler
-# Local wrapper: runs lmc through uv from this repo's directory.
-# Install globally with:  lmc init   (writes ~/.local/bin/lmc)
-set -e
+# Local wrapper: runs lmc via uv. LMC_KB_ROOT captures the caller's working
+# directory so config.py uses it as the knowledge base root, not the repo root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec uv run --directory "$SCRIPT_DIR" lmc "$@"
+exec LMC_KB_ROOT="$(pwd)" uv run --directory "$SCRIPT_DIR" lmc "$@"

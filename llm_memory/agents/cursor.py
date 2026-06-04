@@ -17,11 +17,13 @@ from pathlib import Path
 
 from llm_memory.agents.base import AgentAdapter, InstallResult
 
-_HOOKS = {
-    "sessionStart": [{"command": "./lmc hook cursor-session-start", "timeout": 15}],
-    "sessionEnd":   [{"command": "./lmc hook cursor-session-end",   "timeout": 10}],
-    "preCompact":   [{"command": "./lmc hook cursor-pre-compact",   "timeout": 10}],
-}
+def _hooks_for(kb_root: Path) -> dict:
+    r = str(kb_root)
+    return {
+        "sessionStart": [{"command": f"lmc hook --kb-root {r} cursor-session-start", "timeout": 15}],
+        "sessionEnd":   [{"command": f"lmc hook --kb-root {r} cursor-session-end",   "timeout": 10}],
+        "preCompact":   [{"command": f"lmc hook --kb-root {r} cursor-pre-compact",   "timeout": 10}],
+    }
 
 
 class CursorAdapter(AgentAdapter):
@@ -43,7 +45,7 @@ class CursorAdapter(AgentAdapter):
             config = {}
 
         config["version"] = 1
-        config.setdefault("hooks", {}).update(_HOOKS)
+        config.setdefault("hooks", {}).update(_hooks_for(project_root))
         # Remove the old stop hook if present from a previous install
         config["hooks"].pop("stop", None)
 

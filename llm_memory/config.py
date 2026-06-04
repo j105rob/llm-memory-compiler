@@ -1,10 +1,14 @@
 """Path constants and configuration for the llm-memory-compiler."""
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-_CWD = Path.cwd()
+# LMC_KB_ROOT is set by the lmc wrapper scripts so the KB root is always the
+# directory the user invoked lmc from, not the repo directory uv runs in.
+_KB_ROOT_ENV = os.environ.get("LMC_KB_ROOT")
+_CWD = Path(_KB_ROOT_ENV).resolve() if _KB_ROOT_ENV else Path.cwd()
 _CONFIG_FILE = _CWD / ".llm-memory" / "config.json"
 
 
@@ -42,6 +46,9 @@ LAST_FLUSH_FILE = _state_base / "last-flush.json"
 STATE_DIR = _state_base
 FLUSH_LOG_FILE = _state_base / "flush.log"
 COMPILE_LOG_FILE = _state_base / "compile.log"
+
+# ── Global lmc home ───────────────────────────────────────────────────
+LMC_HOME = Path.home() / ".lmc"
 
 # ── Agent / Provider config ────────────────────────────────────────────
 TIMEZONE = _cfg.get("timezone", "America/Chicago")
