@@ -1,6 +1,6 @@
 {
   "agent": "claude-code",
   "api_provider": "claude-agent-sdk",
-  "knowledge_dir": "knowledge",
-  "daily_dir": "daily"
+  "knowledge_dir": "llm-memory/knowledge",
+  "daily_dir": "llm-memory/daily"
 }

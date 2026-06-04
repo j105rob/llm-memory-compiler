@@ -26,15 +26,19 @@ _config_exists = _CONFIG_FILE.exists()
 
 # ── Paths ──────────────────────────────────────────────────────────────
 ROOT_DIR = _CWD
-DAILY_DIR = ROOT_DIR / _cfg.get("daily_dir", "daily")
-KNOWLEDGE_DIR = ROOT_DIR / _cfg.get("knowledge_dir", "knowledge")
+LMC_CONTENT_DIR = ROOT_DIR / "llm-memory"   # project-level content root
+DAILY_DIR = ROOT_DIR / _cfg.get("daily_dir", "llm-memory/daily")
+KNOWLEDGE_DIR = ROOT_DIR / _cfg.get("knowledge_dir", "llm-memory/knowledge")
 CONCEPTS_DIR = KNOWLEDGE_DIR / "concepts"
 CONNECTIONS_DIR = KNOWLEDGE_DIR / "connections"
 QA_DIR = KNOWLEDGE_DIR / "qa"
-REPORTS_DIR = ROOT_DIR / "reports"
+REPORTS_DIR = LMC_CONTENT_DIR / "reports"
 SCRIPTS_DIR = ROOT_DIR / "scripts"
 HOOKS_DIR = ROOT_DIR / "hooks"
-AGENTS_FILE = ROOT_DIR / "AGENTS.md"
+
+# AGENTS.md lives in llm-memory/ in the project; fall back to root for legacy setups.
+_agents_candidates = [LMC_CONTENT_DIR / "AGENTS.md", ROOT_DIR / "AGENTS.md"]
+AGENTS_FILE = next((p for p in _agents_candidates if p.exists()), LMC_CONTENT_DIR / "AGENTS.md")
 
 INDEX_FILE = KNOWLEDGE_DIR / "index.md"
 LOG_FILE = KNOWLEDGE_DIR / "log.md"

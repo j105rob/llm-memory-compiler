@@ -172,7 +172,7 @@ def install(bin_dir: str | None) -> None:
     lmc_script = _write_lmc_script(project_root, target_dir)
     _console.print(f"  [green]✓[/green] Wrote [cyan]{lmc_script}[/cyan]")
 
-    # ── Create ~/.lmc home directory ──
+    # ── Create ~/.lmc home directory and cache templates ──
     from llm_memory.config import LMC_HOME
     import datetime as _dt
     LMC_HOME.mkdir(parents=True, exist_ok=True)
@@ -183,6 +183,14 @@ def install(bin_dir: str | None) -> None:
     }
     (LMC_HOME / "install.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     _console.print(f"  [green]✓[/green] Created [cyan]{LMC_HOME}[/cyan]")
+
+    templates_dir = LMC_HOME / "templates"
+    templates_dir.mkdir(exist_ok=True)
+    for fname in ("AGENTS.md", "README.md"):
+        src = project_root / fname
+        if src.exists():
+            shutil.copy2(src, templates_dir / fname)
+    _console.print(f"  [green]✓[/green] Cached templates → [cyan]{templates_dir}[/cyan]")
 
     # ── PATH check ──
     if not _bin_dir_on_path(target_dir):
@@ -281,12 +289,12 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
 
     # ── Directories ──
     if knowledge_dir is None and is_tty:
-        knowledge_dir = click.prompt("Knowledge directory", default="knowledge")
+        knowledge_dir = click.prompt("Knowledge directory", default="llm-memory/knowledge")
     if daily_dir is None and is_tty:
-        daily_dir = click.prompt("Daily log directory", default="daily")
+        daily_dir = click.prompt("Daily log directory", default="llm-memory/daily")
 
-    knowledge_dir = knowledge_dir or "knowledge"
-    daily_dir = daily_dir or "daily"
+    knowledge_dir = knowledge_dir or "llm-memory/knowledge"
+    daily_dir = daily_dir or "llm-memory/daily"
 
     # ── Write config ──
     config_data = {
@@ -296,10 +304,35 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
         "daily_dir": daily_dir,
     }
     config_file = _write_config(project_root, config_data)
-    _console.print(f"  [green]✓[/green] Wrote [cyan]{config_file.relative_to(project_root)}[/cyan]")
+    _console.print(f"  [green]✓[/green] Wrote [cyan]{config_file}[/cyan]")
 
     # Migrate existing state if present
     _migrate_state(project_root)
+
+    # ── Create content directories ──
+    daily_path = project_root / daily_dir
+    knowledge_path = project_root / knowledge_dir
+    daily_path.mkdir(parents=True, exist_ok=True)
+    _console.print(f"  [green]✓[/green] Created [cyan]{daily_path}/[/cyan]")
+    for subdir in ("concepts", "connections", "qa"):
+        (knowledge_path / subdir).mkdir(parents=True, exist_ok=True)
+    _console.print(f"  [green]✓[/green] Created [cyan]{knowledge_path}/[/cyan]")
+
+    # ── Copy AGENTS.md (required by lmc compile) ──
+    from llm_memory.config import LMC_HOME
+    lmc_content_dir = project_root / "llm-memory"
+    lmc_content_dir.mkdir(exist_ok=True)
+    for fname in ("AGENTS.md", "README.md"):
+        src = LMC_HOME / "templates" / fname
+        dest = lmc_content_dir / fname
+        if src.exists() and not dest.exists():
+            shutil.copy2(src, dest)
+            _console.print(f"  [green]✓[/green] Copied  [cyan]{dest}[/cyan]")
+        elif not src.exists() and fname == "AGENTS.md":
+            _console.print(
+                f"  [yellow]![/yellow] AGENTS.md template not found in [cyan]{LMC_HOME / 'templates'}[/cyan] — "
+                "run [bold]lmc install[/bold] first"
+            )
 
     # ── Install agent hooks/config ──
     from llm_memory.agents import get_agent
@@ -307,11 +340,7 @@ def init(agent: str | None, provider: str | None, knowledge_dir: str | None, dai
     result = adapter.install(project_root)
 
     for f in result.files_written:
-        try:
-            label = f.relative_to(project_root)
-        except ValueError:
-            label = f  # outside project root (e.g. global ~/.codeium/ config)
-        _console.print(f"  [green]✓[/green] Wrote [cyan]{label}[/cyan]")
+        _console.print(f"  [green]✓[/green] Wrote  [cyan]{f}[/cyan]")
 
     _console.print()
     _console.print(Rule(style="dim"))
