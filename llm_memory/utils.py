@@ -3,7 +3,34 @@
 import hashlib
 import json
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
+
+
+def rotate_log(log_file: Path, max_days: int = 7) -> None:
+    """Remove lines older than max_days from a timestamped log file.
+
+    Expects lines starting with "YYYY-MM-DD HH:MM:SS". Lines that don't
+    match (stack trace continuations, blank lines) are always kept.
+    Non-fatal: any error during rotation is silently ignored.
+    """
+    if not log_file.exists():
+        return
+    try:
+        cutoff = datetime.now() - timedelta(days=max_days)
+        lines = log_file.read_text(encoding="utf-8").splitlines(keepends=True)
+        kept = []
+        for line in lines:
+            try:
+                ts = datetime.strptime(line[:19], "%Y-%m-%d %H:%M:%S")
+                if ts >= cutoff:
+                    kept.append(line)
+            except (ValueError, IndexError):
+                kept.append(line)
+        if len(kept) < len(lines):
+            log_file.write_text("".join(kept), encoding="utf-8")
+    except Exception:
+        pass
 
 from llm_memory.config import (
     CONCEPTS_DIR,

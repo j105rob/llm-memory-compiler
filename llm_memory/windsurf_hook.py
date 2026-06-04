@@ -26,6 +26,8 @@ MIN_TURNS_TO_FLUSH = 3
 
 def _setup_logging(log_file: Path) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
+    from llm_memory.utils import rotate_log
+    rotate_log(log_file)
     logging.basicConfig(
         filename=str(log_file),
         level=logging.INFO,

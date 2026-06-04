@@ -84,6 +84,34 @@ def _bin_dir_on_path(bin_dir: Path) -> bool:
     return str(bin_dir) in os.environ.get("PATH", "").split(os.pathsep)
 
 
+_LMC_GITIGNORE_ENTRIES = [
+    ".llm-memory/flush.log",
+    ".llm-memory/compile.log",
+    ".llm-memory/last-flush.json",
+    ".llm-memory/state.json",
+    ".llm-memory/session-flush-*.md",
+    ".llm-memory/cursor-*.md",
+]
+
+
+def _update_gitignore(project_root: Path) -> Path | None:
+    """Append lmc operational files to .gitignore if not already present."""
+    if not (project_root / ".git").is_dir():
+        return None
+    gitignore = project_root / ".gitignore"
+    existing_text = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+    existing_lines = set(existing_text.splitlines())
+    to_add = [e for e in _LMC_GITIGNORE_ENTRIES if e not in existing_lines]
+    if not to_add:
+        return None
+    with open(gitignore, "a", encoding="utf-8") as f:
+        if existing_text and not existing_text.endswith("\n"):
+            f.write("\n")
+        f.write("# lmc — operational files\n")
+        f.write("\n".join(to_add) + "\n")
+    return gitignore
+
+
 def _kb_root() -> Path:
     """Return the knowledge base root: LMC_KB_ROOT env var if set, else cwd."""
     import os
@@ -331,6 +359,11 @@ def init(agent: str | None, provider: str | None, model: str | None, knowledge_d
 
     # Migrate existing state if present
     _migrate_state(project_root)
+
+    # ── .gitignore ──
+    gi = _update_gitignore(project_root)
+    if gi:
+        _console.print(f"  [green]✓[/green] Updated [cyan]{gi}[/cyan]")
 
     # ── Create content directories ──
     daily_path = project_root / daily_dir
