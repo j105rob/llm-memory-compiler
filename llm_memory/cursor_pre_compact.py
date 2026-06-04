@@ -104,10 +104,11 @@ def main() -> None:
     creation_flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
     try:
+        log_fh = open(str(FLUSH_LOG_FILE), "a")
         subprocess.Popen(
             cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_fh,
+            stderr=log_fh,
             creationflags=creation_flags,
         )
         logging.info(
