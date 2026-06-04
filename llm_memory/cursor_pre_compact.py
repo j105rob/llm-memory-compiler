@@ -60,10 +60,13 @@ def main() -> None:
         conversation_id, trigger, usage_pct,
     )
 
+    logging.info("full hook payload: %s", json.dumps(hook_input))
+
     transcript_path_str = (
         hook_input.get("transcript_path")
         or os.environ.get("CURSOR_TRANSCRIPT_PATH", "")
     )
+    logging.info("transcript_path=%s", transcript_path_str or "(none)")
     if not transcript_path_str:
         logging.info("SKIP: no transcript path")
         return
@@ -74,11 +77,18 @@ def main() -> None:
         return
 
     try:
+        sample = transcript_path.read_text(encoding="utf-8")[:1000]
+        logging.info("transcript sample: %s", sample.replace("\n", " ↵ "))
+    except Exception as e:
+        logging.error("could not read transcript: %s", e)
+
+    try:
         context, turn_count = extract_conversation_context(transcript_path)
     except Exception as e:
         logging.error("Context extraction failed: %s", e)
         return
 
+    logging.info("extracted %d turns", turn_count)
     if not context.strip() or turn_count < MIN_TURNS_TO_FLUSH:
         logging.info("SKIP: only %d turns (min %d)", turn_count, MIN_TURNS_TO_FLUSH)
         return
