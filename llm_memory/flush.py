@@ -121,29 +121,50 @@ respond with exactly: FLUSH_OK
 
 
 def maybe_trigger_compilation(root: Path, daily_dir: Path, state_dir: Path) -> None:
-    import subprocess as _sp
+    """Spawn lmc compile in the background if any daily log needs compiling.
 
-    now = datetime.now(timezone.utc).astimezone()
-    if now.hour < COMPILE_AFTER_HOUR:
+    Prior-day logs are compiled unconditionally — they are complete.
+    Today's log is only compiled after COMPILE_AFTER_HOUR so we don't
+    compile a partial day while sessions are still ongoing.
+    """
+    import subprocess as _sp
+    from hashlib import sha256
+
+    if not daily_dir.exists():
         return
 
-    today_log = f"{now.strftime('%Y-%m-%d')}.md"
+    now = datetime.now(timezone.utc).astimezone()
+    today = now.strftime("%Y-%m-%d")
+
     compile_state_file = state_dir / "state.json"
+    ingested: dict = {}
     if compile_state_file.exists():
         try:
-            compile_state = json.loads(compile_state_file.read_text(encoding="utf-8"))
-            ingested = compile_state.get("ingested", {})
-            if today_log in ingested:
-                from hashlib import sha256
-                log_path = daily_dir / today_log
-                if log_path.exists():
-                    current_hash = sha256(log_path.read_bytes()).hexdigest()[:16]
-                    if ingested[today_log].get("hash") == current_hash:
-                        return
+            ingested = json.loads(compile_state_file.read_text(encoding="utf-8")).get("ingested", {})
         except (json.JSONDecodeError, OSError):
             pass
 
-    logging.info("End-of-day compilation triggered (after %d:00)", COMPILE_AFTER_HOUR)
+    needs_compile = False
+    for log_file in sorted(daily_dir.glob("*.md")):
+        log_date = log_file.stem  # "2026-06-04"
+
+        # Hold off on today's log until after COMPILE_AFTER_HOUR
+        if log_date == today and now.hour < COMPILE_AFTER_HOUR:
+            continue
+
+        # Skip if already compiled with the same content
+        log_name = log_file.name
+        if log_name in ingested:
+            current_hash = sha256(log_file.read_bytes()).hexdigest()[:16]
+            if ingested[log_name].get("hash") == current_hash:
+                continue
+
+        needs_compile = True
+        logging.info("Uncompiled log found: %s — triggering compile", log_name)
+        break
+
+    if not needs_compile:
+        return
 
     from llm_memory.config import lmc_cmd
     cmd = [*lmc_cmd(), "compile"]
